@@ -1,33 +1,38 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+// Initialize the express 'app' object
+let express = require("express");
+let app = express();
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 5e6 });
+// Initialize HTTP server
+let http = require("http");
+let server = http.createServer(app);
 
-app.use(express.static('public'));
+// Initialize Socket.IO
+let io = require("socket.io");
+io = new io.Server(server);
 
-let history = [];
-let shapes = [];
+// Serve static files from the 'public' directory
+app.use("/", express.static("public"));
 
-io.on('connection', (socket) => {
-  socket.emit('init', { history, shapes });
+// Socket connection handling
+io.on("connection", (socket) => {
+  console.log("Client connected: " + socket.id);
 
-  socket.on('draw', (d) => {
-    history.push(d);
-    socket.broadcast.emit('draw', d);
+  // Listen for 'message' events containing emoji position payload { x, y, emoji, size }
+  socket.on("message", (data) => {
+    console.log(`Emoji payload from ${socket.id}:`, data);
+
+    // Broadcast emoji trail data to ALL connected clients
+    io.emit("message-share", data);
   });
 
-  socket.on('saveShape', (s) => {
-    shapes.push(s);
-    io.emit('shapeSaved', s);
-  });
-
-  socket.on('clear', () => {
-    history = [];
-    io.emit('clear');
+  // Handle client disconnection
+  socket.on("disconnect", () => {
+    console.log("Client disconnected: " + socket.id);
   });
 });
 
-server.listen(3000, () => console.log('listening at http://localhost:3000'));
+// Set port and start server
+let port = process.env.PORT || 3000;
+server.listen(port, () => {
+  console.log("App listening on port: " + port);
+});
